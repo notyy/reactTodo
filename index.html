@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>my todo app</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <script src="js/react.js"></script>
+  <script src="js/JSXTransformer.js"></script>
+</head>
+<body>
+  <div>输入逗号分隔的以分钟为单位的时间设定，比如10,20,10,注意用英文的逗号，
+    点击设置，然后点击启动即可启动顺序执行的闹钟，比如10分钟热身，然后20分钟锻炼，再10分钟恢复，分别会在相应的时候响铃</div>
+  <div id="example"></div>
+  <script type="text/jsx">
+  var timerData = [
+    {minute: 10,second: 0, status: 'completed'},
+    {minute: 1, second: 0, status: 'completed'},
+    {minute: 0, second: 5, status: 'running'}
+  ]
+
+  var SetTimerButton = React.createClass({
+    getInitialState: function() {
+      return({timeStr: "10,20,10"});
+    },
+    handleClick: function(event) {
+      this.props.onSetTimer(this.state.timeStr);
+    },
+    handleChange: function(event){
+      this.setState({timeStr: event.target.value})
+    },
+    render: function() {
+      return(
+        <div>
+          <input value={this.state.timeStr} onChange={this.handleChange}></input>
+          <input value="设置定时器" type="button" onClick={this.handleClick}></input>
+        </div>
+      );
+    }
+  });
+
+  var TimerBox = React.createClass({
+    getInitialState: function() {
+      return {data: [], running: false};
+    },
+    handleSetTimer: function(newTimerData) {
+      var timers = newTimerData.split("/[\,，]/");
+      var newData = timers.map(function(minute){
+        return({minute: minute,second: 0, status: 'waiting'});
+      });
+      this.setState({data: newData, running: false});
+    },
+    tick: function() {
+      console.info('calling')
+      var newState = this.state.data.map(function(timerSetting,idx) {
+        // console.info(timerSetting)
+        if(timerSetting.status == 'running') {
+          var newMinute = timerSetting.minute;
+          var newSecond = timerSetting.second;
+          if(timerSetting.second == 0){
+            if(timerSetting.minute > 0){
+              newMinute = timerSetting.minute - 1;
+              newSecond = 59;
+            }else{
+              console.info("playing sound")
+              document.getElementById("ddsound").play();
+              if(idx < this.state.data.length - 1){
+                var nextTimer = this.state.data[idx+1]
+                nextTimer.status = 'running'
+                this.state.data[idx+1] = nextTimer
+              }else{
+                console.info("clearing interval")
+                clearInterval(this.interval)
+              }
+              return({minute: 0,second: 0, status: 'completed'});
+            }
+          }else{
+            newSecond = timerSetting.second - 1;
+          }
+          return({minute: newMinute, second: newSecond, status: 'running'});
+        }else{
+          return(timerSetting);
+        }
+      },this)
+      this.setState({data:newState, running: true});
+      // console.info(newState)
+    },
+    handleStartTimer: function() {
+      var newState = this.state
+      if(this.state.running){
+        clearInterval(this.interval);
+        newState.running = false
+        this.setState(newState)
+      }else{
+        if(this.state.data.filter(function(t){
+          t.status == "running";
+        }).length <= 0){
+          newState.data[0].status = "running";
+          this.setState(newState)
+        }
+        this.interval = setInterval(this.tick, 1000);
+      }
+    },
+    render: function() {
+      var timers = this.state.data.map(function (timerSetting,idx) {
+        return(<li><input disabled value={timerSetting.minute >= 0 ? timerSetting.minute : ''}>分钟</input><input disabled value={timerSetting.second}>秒钟</input></li>);
+      }, this);
+      return (
+        <div>
+          <audio id="ddsound" src="bell.wav" autostart="false"></audio>
+          <SetTimerButton onSetTimer={this.handleSetTimer}></SetTimerButton>
+          <input type="button" value={this.state.running ? "运行中" : "启动"} onClick={this.handleStartTimer}></input>
+          <ul>
+            {timers}
+          </ul>
+        </div>
+      );
+    }
+  });
+
+  React.render(
+    <TimerBox />,
+    document.getElementById('example')
+  );
+
+  </script>
+</body>
+</html>
