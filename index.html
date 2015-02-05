@@ -3,7 +3,7 @@
 <head>
   <title>my todo app</title>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <script src="js/react.js"></script>
+  <script src="js/react-with-addons.min.js"></script>
   <script src="js/JSXTransformer.js"></script>
 </head>
 <body>
@@ -42,7 +42,7 @@
       return {data: [], running: false};
     },
     handleSetTimer: function(newTimerData) {
-      var timers = newTimerData.split("/[\,，]/");
+      var timers = newTimerData.split(",");
       var newData = timers.map(function(minute){
         return({minute: minute,second: 0, status: 'waiting'});
       });
@@ -101,7 +101,7 @@
     },
     render: function() {
       var timers = this.state.data.map(function (timerSetting,idx) {
-        return(<li><input disabled value={timerSetting.minute >= 0 ? timerSetting.minute : ''}>分钟</input><input disabled value={timerSetting.second}>秒钟</input></li>);
+        return(<li><input key={idx+"minute"} disabled value={timerSetting.minute >= 0 ? timerSetting.minute : ''}>分钟</input><input key={idx+"second"} disabled value={timerSetting.second}>秒钟</input></li>);
       }, this);
       return (
         <div>
