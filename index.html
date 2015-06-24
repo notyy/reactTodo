@@ -3,114 +3,152 @@
 <head>
   <title>my todo app</title>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <script src="js/react-with-addons.min.js"></script>
+  <script src="js/jquery.min.js"></script>
+  <link href="css/semantic.min.css" rel="stylesheet">
+  <script src="js/semantic.min.js"></script>
+  <script src="js/react-with-addons.js"></script>
   <script src="js/JSXTransformer.js"></script>
 </head>
 <body>
-  <div>输入逗号分隔的以分钟为单位的时间设定，比如10,20,10,注意用英文的逗号，
-    点击设置，然后点击启动即可启动顺序执行的闹钟，比如10分钟热身，然后20分钟锻炼，再10分钟恢复，分别会在相应的时候响铃</div>
   <div id="example"></div>
   <script type="text/jsx">
-  var timerData = [
-    {minute: 10,second: 0, status: 'completed'},
-    {minute: 1, second: 0, status: 'completed'},
-    {minute: 0, second: 5, status: 'running'}
-  ]
-
-  var SetTimerButton = React.createClass({
-    getInitialState: function() {
-      return({timeStr: "10,20,10"});
+  var TimerProgressTable = React.createClass({
+    getInitialState: function(){
+      var conf = this.props.conf
+      return {data: conf.data, running: conf.running, currIdx: 0};
     },
-    handleClick: function(event) {
-      this.props.onSetTimer(this.state.timeStr);
+    tick: function(){
+      var newState = this.state;
+      var currData = this.state.data[this.state.currIdx];
+      var currIdx = this.state.currIdx;
+      if(currData.second > 0){
+        newState.data[currIdx].second = currData.second - 1;
+      }else if(currData.minute > 0){
+        newState.data[currIdx].minute = currData.minute - 1;
+        newState.data[currIdx].second = 59;
+      }else{
+        newState.data[currIdx].status = 'completed';
+        document.getElementById("ddsound").play(); //an item is complete, play sound
+        if(currIdx < this.state.data.length - 1){
+          var newIdx = currIdx + 1;
+          newState.data[newIdx].status = 'running';
+          newState.currIdx = newIdx;
+          this.setState(newState);
+        }else{
+          clearInterval(this.interval); //no item left, close the tick;
+        }
+      }
+      this.setState(newState);
     },
-    handleChange: function(event){
-      this.setState({timeStr: event.target.value})
+    reconfig: function() {
+      this.state.data = this.props.conf.data;
+      this.state.running = false;
+      this.state.currIdx = 0;
+      clearInterval(this.interval);
+    },
+    restart: function() {
+      this.state.running = this.props.conf.running;
+      this.state.data[0].status = 'running';
+      this.interval = setInterval(this.tick, 1000);
     },
     render: function() {
-      return(
-        <div>
-          <input value={this.state.timeStr} onChange={this.handleChange}></input>
-          <input value="设置定时器" type="button" onClick={this.handleClick}></input>
-        </div>
-      );
+      if(this.state.data != this.props.conf.data){
+        this.reconfig();
+      }else if(this.state.running != this.props.conf.running){
+        this.restart();
+      }
+      var timerItems = this.state.data.map(function(item,idx){
+        var statusClass;
+        if(item.status == 'completed'){
+          statusClass = 'disabled'
+        }else if(item.status == 'running'){
+          statusClass = 'positive'
+        };
+
+        return(
+          <tr key={idx} className={statusClass}>
+            <td>{item.minute}</td>
+            <td>{item.second}</td>
+          </tr>
+        );
+      });
+
+      var table =
+      <table className="ui table" height="200px">
+        <thead>
+          <tr>
+            <th>分钟</th>
+            <th>秒</th>
+            </tr>
+        </thead>
+        <tbody>
+          {timerItems}
+        </tbody>
+      </table>;
+      return(table);
     }
   });
 
   var TimerBox = React.createClass({
     getInitialState: function() {
-      return {data: [], running: false};
-    },
-    handleSetTimer: function(newTimerData) {
-      var timers = newTimerData.split(",");
-      var newData = timers.map(function(minute){
-        return({minute: minute,second: 0, status: 'waiting'});
-      });
-      this.setState({data: newData, running: false});
-    },
-    tick: function() {
-      console.info('calling')
-      var newState = this.state.data.map(function(timerSetting,idx) {
-        // console.info(timerSetting)
-        if(timerSetting.status == 'running') {
-          var newMinute = timerSetting.minute;
-          var newSecond = timerSetting.second;
-          if(timerSetting.second == 0){
-            if(timerSetting.minute > 0){
-              newMinute = timerSetting.minute - 1;
-              newSecond = 59;
-            }else{
-              console.info("playing sound")
-              document.getElementById("ddsound").play();
-              if(idx < this.state.data.length - 1){
-                var nextTimer = this.state.data[idx+1]
-                nextTimer.status = 'running'
-                this.state.data[idx+1] = nextTimer
-              }else{
-                console.info("clearing interval")
-                clearInterval(this.interval)
-              }
-              return({minute: 0,second: 0, status: 'completed'});
-            }
-          }else{
-            newSecond = timerSetting.second - 1;
-          }
-          return({minute: newMinute, second: newSecond, status: 'running'});
-        }else{
-          return(timerSetting);
-        }
-      },this)
-      this.setState({data:newState, running: true});
-      // console.info(newState)
+      var s = "10/20/10";
+      var timerData = this.inputToTimerData(s);
+      var initState = {input: s, data: timerData, running: false};
+      return initState;
     },
     handleStartTimer: function() {
-      var newState = this.state
-      if(this.state.running){
-        clearInterval(this.interval);
-        newState.running = false
-        this.setState(newState)
+      var newState = this.state;
+      newState.running = true;
+      this.setState(newState);
+    },
+    inputToTimerData: function(inputStr){
+      return(inputStr.split("/").map(function(item){
+        return({minute: item,second: 0, status: 'waiting'})
+      }));
+    },
+    handleConfigTimer: function(e) {
+      var newState = this.state;
+      if(this.state.input.length <= 0){
+        alert("没有可以运行的时钟！");
       }else{
-        if(this.state.data.filter(function(t){
-          t.status == "running";
-        }).length <= 0){
-          newState.data[0].status = "running";
-          this.setState(newState)
-        }
-        this.interval = setInterval(this.tick, 1000);
+        newState.data = this.inputToTimerData(this.state.input);
+        newState.runningTimerIdx = 0;
+        this.setState(newState);
       }
     },
+    updateTimer: function(e){
+      var newState = this.state;
+      newState.input = e.target.value;
+      this.setState(newState);
+    },
     render: function() {
-      var timers = this.state.data.map(function (timerSetting,idx) {
-        return(<li><input key={idx+"minute"} disabled value={timerSetting.minute >= 0 ? timerSetting.minute : ''}>分钟</input><input key={idx+"second"} disabled value={timerSetting.second}>秒钟</input></li>);
-      }, this);
       return (
-        <div>
+        <div className="ui four column centered grid">
           <audio id="ddsound" src="bell.wav" autostart="false"></audio>
-          <SetTimerButton onSetTimer={this.handleSetTimer}></SetTimerButton>
-          <input type="button" value={this.state.running ? "运行中" : "启动"} onClick={this.handleStartTimer}></input>
-          <ul>
-            {timers}
-          </ul>
+          <div className="eight wide column">
+            <div className="ui red tag below label">
+              10分钟热身，然后20分钟锻炼，再10分钟恢复，一个定时器搞定！
+            </div>
+          </div>
+          <div className="four column centered row">
+            <div className="column">
+              <div className="ui fluid input">
+                <input value={this.state.input} onChange={this.updateTimer}/>
+              </div>
+            </div>
+            <div className="column">
+              <div className="ui secondary button" onClick={this.handleConfigTimer}>设置</div>
+              <div className="ui primary button" onClick={this.handleStartTimer}>运行</div>
+            </div>
+          </div>
+          <div className="four column centered row">
+            <div className="column">
+              <TimerProgressTable conf={{data: this.state.data, running: this.state.running}} />
+            </div>
+            <div className="column">
+              { /* place holder */}
+            </div>
+          </div>
         </div>
       );
     }
@@ -120,7 +158,6 @@
     <TimerBox />,
     document.getElementById('example')
   );
-
   </script>
 </body>
 </html>
